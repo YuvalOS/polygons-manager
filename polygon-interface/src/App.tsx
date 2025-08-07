@@ -1,36 +1,12 @@
 
 import { useState, useRef, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  List,
-  ListItem,
-  ListItemText,
-  IconButton,
-  TextField,
-  Button,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-} from '@mui/material';
-import { Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import { ToastContainer, toast } from 'react-toastify';
+import { toast } from 'react-toastify';
+import { IMAGE_URL, POLYGONS_API_BASE } from './App.consts';
+import type { Polygon } from './App.types';
+import AppView from './App.view';
 
 
-const POLYGONS_API_BASE = 'http://localhost:5000/api';
-
-
-type Polygon = {  
-  id: number;
-  name: string;
-  points: number[][] 
-}; 
-
-
-function App() {
-  const notify = () => toast.success("Wow so easy!");
+const App = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [currentPolygon, setCurrentPolygon] = useState<number[][]>([]);
@@ -38,13 +14,12 @@ function App() {
   const [newPolygonName, setNewPolygonName] = useState('');
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [showNameDialog, setShowNameDialog] = useState(false);
-
-  // Sample image (you can replace with your own image)
-  const imageUrl = '../public/traffic-junction-urban.jpg'; // Ensure this path is correct
+  const [loading, setLoading] = useState(false);
 
   // API functions
   const fetchPolygons = async () => {
     try {
+      setLoading(true);
       const response = await fetch(`${POLYGONS_API_BASE}/polygons`);
       if (response.ok) {
         const data = await response.json();
@@ -52,14 +27,23 @@ function App() {
       } else {
         toast.error('Failed to fetch polygons');
       }
+      
+      setLoading(false);
+      return response; // no need to read it with .json() here, as it already been done above
+
     } catch (error) {
       console.error('Error fetching polygons:', error);
       toast.error(`Failed to fetch polygons: ${error}`);
+      setLoading(false);
+
+      return null;
     }
   };
 
   const createPolygon = async (name: string, points: number[][]) => {
     try {
+      setLoading(true);
+
       const response = await fetch(`${POLYGONS_API_BASE}/polygons`, {
         method: 'POST',
         headers: {
@@ -69,32 +53,42 @@ function App() {
       });
       
       if (response.ok) {
-        await fetchPolygons();
         toast.success('Polygon created successfully!');
+        await fetchPolygons();
       } else {
-        toast.error('Error creating polygon');
+        toast.error('Error creating polygon');  
       }
+
+      setLoading(false);
+      return response.json();
+
     } catch (error) {
       console.error('Error creating polygon:', error);
       toast.error(`Error creating polygon: ${error}`);
+      setLoading(false);
+      
+      return null;
     }
   };
 
   const deletePolygon = async (id: number) => {
     try {
+      setLoading(true);
       const response = await fetch(`${POLYGONS_API_BASE}/polygons/${id}`, {
         method: 'DELETE',
       });
       
       if (response.ok) {
-        await fetchPolygons();
         toast.success('Polygon deleted successfully!');
+        await fetchPolygons();
       } else {
         toast.error('Error deleting polygon');
       }
+      setLoading(false);
     } catch (error) {
       console.error('Error deleting polygon:', error);
       toast.error(`Error deleting polygon: ${error}`);
+      setLoading(false);
     }
   };
 
@@ -182,7 +176,7 @@ function App() {
       }
     };
     
-    img.src = imageUrl;
+    img.src = IMAGE_URL;
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -212,136 +206,49 @@ function App() {
     setCurrentPolygon([]);
   };
 
-  const handleSavePolygon = async () => {
+  const handleCreatePolygon = async () => {
     if (newPolygonName.trim() && currentPolygon.length > 2) {
-      await createPolygon(newPolygonName.trim(), currentPolygon);
-      setCurrentPolygon([]);
+      const res = await createPolygon(newPolygonName.trim(), currentPolygon);
+      
+      // don't reset current polygon state if the polygon already exists with this name, letting the user edit it
+      if (res?.error === 'Polygon with this name already exists') {
+        return;
+      }
+
       setIsDrawing(false);
+      setCurrentPolygon([]);
       setNewPolygonName('');
       setShowNameDialog(false);
     }
   };
 
   const handleDeletePolygon = async (id: number) => {
-    await deletePolygon(id);
+    if (window.confirm('Are you sure you want to delete this polygon?')) {
+      await deletePolygon(id);;
+    }
+
+    
   };
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', width: '100vw', gap: 2 }}>
-      {/* Left Panel - Polygon List */}
-      <ToastContainer />
-      <Paper sx={{  overflowY: 'auto', padding: '0 16px 0 16px', flex: 1 }}>
-        <Typography variant="h6" gutterBottom marginTop={2}>
-          Polygons
-        </Typography>
-        
-        <Box sx={{ mb: 2, width: 'max-content' }}>
-          {!isDrawing ? (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={startDrawing}
-              fullWidth
-            >
-              Draw New Polygon
-            </Button>
-          ) : (
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="outlined"
-                onClick={cancelDrawing}
-                size="small"
-              >
-                Cancel
-              </Button>
-              <Typography variant="body2" sx={{ flexGrow: 1, alignSelf: 'center' }}>
-                Click to add points, click first point to close
-              </Typography>
-            </Box>
-          )}
-        </Box>
-
-        <List>
-          {polygons.map((polygon) => (
-            <ListItem
-              key={polygon.id}
-              divider
-              secondaryAction={
-                <IconButton
-                  edge="end"
-                  onClick={() => handleDeletePolygon(polygon.id)}
-                  color="error"
-                >
-                  <DeleteIcon />
-                </IconButton>
-              }>
-              <ListItemText
-                primary={polygon.name}
-                secondary={`${polygon.points?.length || 0} points`}
-              />
-            </ListItem>
-          ))}
-        </List>
-      </Paper>
-
-      {/* Right Panel - Canvas */}
-      <Paper sx={{ display: 'flex', padding: '0 16px 0 16px', flexDirection: 'column', flex: 2 }}>
-        <Typography variant="h6" gutterBottom marginTop={2}>
-          Image Canvas
-        </Typography>
-        
-        <Box sx={{  display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={400}
-            onClick={handleCanvasClick}
-            style={{
-              border: '1px solid #ccc',
-              cursor: isDrawing ? 'crosshair' : 'default',
-              maxWidth: '100%',
-              maxHeight: '100%'
-            }}
-          />
-          {showSaveButton && (
-          // <Box >
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => setShowNameDialog(true)}
-              disabled={!isDrawing || currentPolygon.length < 3}
-            >
-              Save Polygon
-            </Button>
-          // </Box>
-       )}
-        </Box>
-      </Paper>
-
-      
-      {/* Name Dialog */}
-      <Dialog open={showNameDialog} onClose={() => setShowNameDialog(false)}>
-        <DialogTitle>Name Your Polygon</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Polygon Name"
-            fullWidth
-            variant="outlined"
-            value={newPolygonName}
-            onChange={(e) => setNewPolygonName(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowNameDialog(false)}>Cancel</Button>
-          <Button onClick={handleSavePolygon} variant="contained">
-            Save Polygon
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+    <AppView
+      canvasRef={canvasRef}
+      polygons={polygons}
+      currentPolygon={currentPolygon}
+      isDrawing={isDrawing}
+      showSaveButton={showSaveButton}
+      startDrawing={startDrawing}
+      cancelDrawing={cancelDrawing}
+      handleDeletePolygon={handleDeletePolygon}
+      handleCanvasClick={handleCanvasClick}
+      setShowNameDialog={setShowNameDialog}
+      loading={loading}
+      showNameDialog={showNameDialog}
+      newPolygonName={newPolygonName}
+      setNewPolygonName={setNewPolygonName}
+      handleCreatePolygon={handleCreatePolygon}
+    />
   );
 }
 
-export default App
+export default App;

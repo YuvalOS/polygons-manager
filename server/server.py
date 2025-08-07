@@ -145,13 +145,11 @@ class PolygonService:
                 'INSERT INTO polygons (name, points) VALUES (?, ?)',
                 (name.strip(), json.dumps(points))
             )
-            conn.commit()
-            
-            polygon_id = cursor.lastrowid
+            conn.commit()            
         finally:
             conn.close()
         
-        return PolygonService.get_polygon_by_id(polygon_id)
+        return "success"
     
     @staticmethod
     def delete_polygon(polygon_id: int) -> bool:
