@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { IMAGE_URL, POLYGONS_API_BASE } from './App.consts';
 import type { Polygon } from './App.types';
 import AppView from './App.view';
+import { delay } from './App.utils';
 
 
 const App = () => {
@@ -20,6 +21,7 @@ const App = () => {
   const fetchPolygons = async () => {
     try {
       setLoading(true);
+      await delay(5000);
       const response = await fetch(`${POLYGONS_API_BASE}/polygons`);
       if (response.ok) {
         const data = await response.json();
@@ -43,7 +45,7 @@ const App = () => {
   const createPolygon = async (name: string, points: number[][]) => {
     try {
       setLoading(true);
-
+      await delay(5000);
       const response = await fetch(`${POLYGONS_API_BASE}/polygons`, {
         method: 'POST',
         headers: {
@@ -74,6 +76,7 @@ const App = () => {
   const deletePolygon = async (id: number) => {
     try {
       setLoading(true);
+      await delay(5000);
       const response = await fetch(`${POLYGONS_API_BASE}/polygons/${id}`, {
         method: 'DELETE',
       });
